@@ -33,7 +33,7 @@ def print_timings(fn: Callable[[str], None] = print) -> None:
     Print all stored timing values in microseconds.
     """
     for msg, duration in TIMINGS:
-        fn(f"{msg + ':':50} {int(duration*1000000):7} µs")
+        fn(f"{f'{msg}:':50} {int(duration*1000000):7} µs")
 
 
 def walk(path: Path, glob: str) -> Iterable[Path]:
@@ -42,9 +42,7 @@ def walk(path: Path, glob: str) -> Iterable[Path]:
         for root, dirs, files in os.walk(path):
             dirs[:] = [d for d in dirs if not d.startswith(".")]
             root_path = Path(root)
-            for f in files:
-                if fnmatch(f, glob):
-                    paths.append(root_path / f)
+            paths.extend(root_path / f for f in files if fnmatch(f, glob))
         return paths
 
 
@@ -63,10 +61,10 @@ def try_parse(path: Path, data: Optional[bytes] = None) -> cst.Module:
 
         for version in cst.KNOWN_PYTHON_VERSION_STRINGS[::-1]:
             try:
-                mod = cst.parse_module(
+                return cst.parse_module(
                     data, cst.PartialParserConfig(python_version=version)
                 )
-                return mod
+
             except cst.ParserSyntaxError as e:
                 # keep the first error we see in case parsing fails on all versions
                 if parse_error is None:

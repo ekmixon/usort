@@ -53,11 +53,7 @@ def usort_path(path: Path, *, write: bool = False) -> Iterable[Result]:
     For a given path, format it, or any .py files in it, and yield Result objects
     """
     files: Iterable[Path]
-    if path.is_dir():
-        files = walk(path, "*.py")
-    else:
-        files = [path]
-
+    files = walk(path, "*.py") if path.is_dir() else [path]
     data: bytes = b""
     for f in files:
         try:

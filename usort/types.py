@@ -50,11 +50,12 @@ class SortableImport:
     imported_names: Dict[str, str] = field(default_factory=dict, compare=False)
 
     def __post_init__(self) -> None:
-        if not self.first_module.startswith("."):
-            ndots = 0
-        else:
-            # replicate ... sorting before .. before ., but after absolute
-            ndots = 100 - (len(self.first_module) - len(self.first_module.lstrip(".")))
+        ndots = (
+            100 - (len(self.first_module) - len(self.first_module.lstrip(".")))
+            if self.first_module.startswith(".")
+            else 0
+        )
+
         self.sort_key = SortKey(
             # TODO this will raise on missing category
             category_index=self.config.categories.index(
@@ -110,7 +111,7 @@ class SortableImport:
                 else:
                     # from x import foo [as bar]
                     sort_key = with_dots(node.body[0].module)
-                    name_key = sort_key + "."
+                    name_key = f"{sort_key}."
 
                 if node.body[0].relative:
                     first_dotted_import = sort_key

@@ -12,10 +12,7 @@ from .types import SortableBlock, SortableImport
 
 
 def name_overlap(a: Dict[str, str], b: Dict[str, str]) -> bool:
-    for k, v in b.items():
-        if k in a and a[k] != v:
-            return True
-    return False
+    return any(k in a and a[k] != v for k, v in b.items())
 
 
 def sortable_blocks(
@@ -44,19 +41,18 @@ def sortable_blocks(
             cur.end_idx = i + 1
             cur.stmts.append(imp)
             cur.imported_names.update(imp.imported_names)
-        else:
-            if cur:
-                cur = None
+        elif cur:
+            cur = None
     return ret
 
 
 def is_sortable_import(stmt: cst.CSTNode, config: Config) -> bool:
-    if isinstance(stmt, cst.SimpleStatementLine):
-        com = stmt.trailing_whitespace.comment
-        if com:
-            com_str = com.value.replace(" ", "")
-            if com_str.startswith("#usort:skip") or com_str.startswith("#isort:skip"):
-                return False
+    if not isinstance(stmt, cst.SimpleStatementLine):
+        return False
+    if com := stmt.trailing_whitespace.comment:
+        com_str = com.value.replace(" ", "")
+        if com_str.startswith("#usort:skip") or com_str.startswith("#isort:skip"):
+            return False
 
         # N.b. `body` is a list, because the SimpleStatementLine might have
         # semicolons.  We only look at the first, which is probably the most
@@ -66,28 +62,24 @@ def is_sortable_import(stmt: cst.CSTNode, config: Config) -> bool:
         # but we don't want to do that until we reflow and handle directives
         # like noqa.  TODO do that before calling is_sortable_import, and assert
         # that it's not a compound statement line.
-        if isinstance(stmt.body[0], cst.ImportFrom):
-            # `from x import *` is a barrier
-            if isinstance(stmt.body[0].names, cst.ImportStar):
-                return False
-            # avoid `from .` imports by checking for None, check everything else:
-            #   from . import a -> module == None
-            #   from foo import bar -> module == Name(foo)
-            #   from a.b import c -> module == Attribute(Name(a), Name(b))
-            elif stmt.body[0].module is not None:
-                base = cst.helpers.get_full_name_for_node_or_raise(stmt.body[0].module)
-                names = [name.evaluated_name for name in stmt.body[0].names]
-                if config.is_side_effect_import(base, names):
-                    return False
-            return True
-        elif isinstance(stmt.body[0], cst.Import):
-            base = ""
+    if isinstance(stmt.body[0], cst.ImportFrom):
+        # `from x import *` is a barrier
+        if isinstance(stmt.body[0].names, cst.ImportStar):
+            return False
+        # avoid `from .` imports by checking for None, check everything else:
+        #   from . import a -> module == None
+        #   from foo import bar -> module == Name(foo)
+        #   from a.b import c -> module == Attribute(Name(a), Name(b))
+        elif stmt.body[0].module is not None:
+            base = cst.helpers.get_full_name_for_node_or_raise(stmt.body[0].module)
             names = [name.evaluated_name for name in stmt.body[0].names]
             if config.is_side_effect_import(base, names):
                 return False
-            return True
-        else:
-            return False
+        return True
+    elif isinstance(stmt.body[0], cst.Import):
+        base = ""
+        names = [name.evaluated_name for name in stmt.body[0].names]
+        return not config.is_side_effect_import(base, names)
     else:
         return False
 
@@ -119,10 +111,7 @@ def fixup_whitespace(
 
         if cur_category is None:
             blanks = initial_blank
-        elif i.sort_key.category_index != cur_category:
-            blanks = (cst.EmptyLine(),)
-        elif old_comments:
-            # preserves black formatting
+        elif i.sort_key.category_index != cur_category or old_comments:
             blanks = (cst.EmptyLine(),)
         else:
             blanks = ()

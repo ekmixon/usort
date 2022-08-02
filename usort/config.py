@@ -21,10 +21,7 @@ CAT_THIRD_PARTY = Category("third_party")
 
 
 def known_factory() -> Dict[str, Category]:
-    known = {}
-    for name in STDLIB_TOP_LEVEL_NAMES:
-        known[name] = CAT_STANDARD_LIBRARY
-
+    known = {name: CAT_STANDARD_LIBRARY for name in STDLIB_TOP_LEVEL_NAMES}
     # This is also in the stdlib list, so this override comes last...
     known["__future__"] = CAT_FUTURE
     known["__main__"] = CAT_FIRST_PARTY
@@ -69,11 +66,7 @@ class Config:
         # TODO This logic should be split out to a separate project, as it's
         # reusable and deserves a number of tests to get right.  Can probably
         # also stop once finding a .hg, .git, etc
-        if filename is None:
-            p = Path.cwd()
-        else:
-            p = Path.cwd() / filename
-
+        p = Path.cwd() if filename is None else Path.cwd() / filename
         while True:
             if p.is_dir():
                 candidate = p / "pyproject.toml"
@@ -116,14 +109,9 @@ class Config:
 
         p = filename
 
-        while True:
-            # Stop on root (hopefully works on Windows)
-            if p.parent == p:
-                break
-            # Stop on different volume
-            if p.exists() and p.stat().st_dev != p.parent.stat().st_dev:
-                break
-
+        while p.parent != p and not (
+            p.exists() and p.stat().st_dev != p.parent.stat().st_dev
+        ):
             if (p.parent / "__init__.py").exists():
                 p = p.parent
             else:
@@ -195,8 +183,6 @@ class Config:
         list of know modules with side effects.
         """
         if self.side_effect_modules:
-            candidates: Set[str] = set()
-            for name in names:
-                candidates.add(f"{base}.{name}" if base else name)
+            candidates: Set[str] = {f"{base}.{name}" if base else name for name in names}
             return any(self.side_effect_re.match(candidate) for candidate in candidates)
         return False
